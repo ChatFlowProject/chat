@@ -5,6 +5,9 @@ import com.example.chat.service.ChatServiceIn;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 
 @Entity
 @Getter
@@ -23,12 +26,8 @@ public class ChatRoom {
     @Column(nullable = false)
     private Long user2Id; // 대상 사용자의 Primary Key
 
-    public String getUserName(String username, ChatServiceIn userClient) {
-        MemberResponse memberResponse = userClient.getMemberByUsername(username);
-        if (memberResponse == null) {
-            throw new IllegalArgumentException("멤버 정보를 찾을 수 없습니다: " + username);
-        }
-        return memberResponse.getName();
-    }
+    // Chat과의 관계 설정 (1:N)
+    @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Chat> chatList = new ArrayList<>();
 }
 

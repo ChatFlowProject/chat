@@ -9,6 +9,7 @@ import com.example.chat.dto.MemberResponse;
 
 import com.example.chat.dto.request.GetMessageReq;
 import com.example.chat.dto.request.StartChatReq;
+import com.example.chat.dto.response.GetChatRoomRes;
 import com.example.chat.dto.response.StartChatRes;
 import com.example.chat.entity.Chat;
 import com.example.chat.entity.ChatRoom;
@@ -18,9 +19,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 
@@ -86,18 +91,46 @@ public class ChatService {
                 .build();
         chatRepository.save(chat);
     }
-    // 새로운 채팅방 생성
-    public ChatRoom createNewChatRoom(Long loggedInId, Long targetUserId){
-        // 로그인한 사용자 정보 가져오기
-        MemberResponse loggedInUser = getMemberById(loggedInId);
-        // 대상 사용자 정보 가져오기
-        MemberResponse targetUser = getMemberById(targetUserId);
-        ChatRoom newChatRoom = ChatRoom.builder()
-                .user1Id(loggedInUser.getId())
-                .user2Id(targetUser.getId())
-                .build();
-        return chatRoomRepository.save(newChatRoom);
+    // 채팅방 목록 조회
+
+    public List<GetChatRoomRes> getMyChatRoomList(Long userId){
+        // 두 가지 조건으로 채팅방 목록 조회
+        List<ChatRoom> myChatRoomList1 = chatRoomRepository.findAllByUser1Id(userId);
+        List<ChatRoom> myChatRoomList2 = chatRoomRepository.findAllByUser2Id(userId);
+        // 채팅방 응답 리스트 생성
+        List<GetChatRoomRes> myChatRoomResList = new ArrayList<>();
+        makeChatRoomResList(userId, myChatRoomList1, myChatRoomResList, true);
+        makeChatRoomResList(userId, myChatRoomList2, myChatRoomResList, false);
+        // 최근 메시지 시간 기준으로 정렬
+        myChatRoomResList.sort((chatRoomRes1, chatRoomRes2)->chatRoomRes2.getLastMessageDay().compareTo(chatRoomRes1.getLastMessageDay()));
+        return myChatRoomResList;
     }
+
+    private void makeChatRoomResList(Long userId, List<ChatRoom> chatRooms, List<GetChatRoomRes> myChatRoomResList, boolean isUser1){
+        for(ChatRoom chatRoom: chatRooms){
+            // 상대방 사용자 정보 가져오기
+            Long recipientId = isUser1 ? chatRoom.getUser2Id() : chatRoom.getUser1Id();
+            MemberResponse recipient = getMemberById(recipientId);
+            // 채팅 목록에서 마지막 메시지와 전송 시간 가져오기
+            String lastMessage = "";
+            LocalDateTime lastSendTime = LocalDateTime.now();
+            List<Chat> chatList = chatRoom.getChatList();
+            if(!chatList.isEmpty()){
+                Chat lastChat = chatList.stream()
+                        .max(Comparator.comparing(Chat::getSendTime))
+                        .orElseThrow(); // 마지막 메시지 가져오기
+                lastMessage = lastChat.getMessage();
+                lastSendTime = lastChat.getSendTime();
+            }
+            GetChatRoomRes chatRoomRes = GetChatRoomRes.builder()
+                    .chatRoomId(chatRoom.getId())
+                    .lastMessage(lastMessage)
+                    .lastMessageDay(lastSendTime)
+                    .build();
+            myChatRoomResList.add(chatRoomRes);
+        }
+    }
+
 }
 
 

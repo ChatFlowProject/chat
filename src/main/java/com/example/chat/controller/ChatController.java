@@ -4,6 +4,7 @@ import com.example.chat.common.BaseResponse;
 import com.example.chat.config.MemberServiceClient;
 import com.example.chat.dto.MemberResponse;
 import com.example.chat.dto.request.StartChatReq;
+import com.example.chat.dto.response.GetChatRoomRes;
 import com.example.chat.dto.response.StartChatRes;
 import com.example.chat.service.ChatService;
 import jakarta.validation.Valid;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 
 
 @RestController
@@ -27,6 +29,13 @@ public class ChatController {
         Long userId = response.getBody().getId();
         return new BaseResponse<>(chatService.startChat(userId, startChatReq));
     }
-
+    // 채팅방 목록 조회
+    @GetMapping("/chatRoomList")
+    public BaseResponse<List<GetChatRoomRes>> chatRoomList(){
+        // 현재 사용자 정보 조회
+        ResponseEntity<MemberResponse> response = memberServiceClient.getMemberByMemberId("current");
+        Long userId = response.getBody().getId();
+        return new BaseResponse<>(chatService.getMyChatRoomList(userId));
+    }
 }
 

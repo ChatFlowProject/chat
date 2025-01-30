@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 public class GetChatRoomRes {
     private Long chatRoomId;
     private String recipientNickname;
-    private String recipientProfile;
     private Long recipientId;
     private String lastMessage;
     private LocalDateTime lastMessageDay;
