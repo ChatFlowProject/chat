@@ -27,6 +27,10 @@ public class Chat {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
 
+    // 발신자 ID (회원 ID)
+    @Column(nullable = false)
+    private Long senderId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="chat_room_id", nullable = false)
     private ChatRoom chatRoom;

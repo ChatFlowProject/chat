@@ -9,6 +9,7 @@ import com.example.chat.dto.MemberResponse;
 
 import com.example.chat.dto.request.GetMessageReq;
 import com.example.chat.dto.request.StartChatReq;
+import com.example.chat.dto.response.GetChatMessageRes;
 import com.example.chat.dto.response.GetChatRoomRes;
 import com.example.chat.dto.response.StartChatRes;
 import com.example.chat.entity.Chat;
@@ -16,10 +17,13 @@ import com.example.chat.entity.ChatRoom;
 import com.example.chat.repository.ChatRepository;
 import com.example.chat.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
+
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -130,7 +134,25 @@ public class ChatService {
             myChatRoomResList.add(chatRoomRes);
         }
     }
-
+    // 채팅 메시지 조회
+    public List<GetChatMessageRes> getChatMessageList(Long userId, Long chatRoomId, Integer page, Integer size){
+        Pageable pageable = PageRequest.of(page, size);
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId).orElseThrow(()-> new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
+        if(!chatRoom.getUser1Id().equals(userId) && !chatRoom.getUser2Id().equals(userId)) {
+            throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID);
+        }
+        List<Chat> chatList = chatRepository.findByChatRoomIdOrderBySendTimeDesc(pageable, chatRoomId).stream().toList();
+        List<GetChatMessageRes> getChatMessageResList = new ArrayList<>();
+        for(Chat chat: chatList){
+            GetChatMessageRes getChatMessageRes = GetChatMessageRes.builder()
+                    .message(chat.getMessage())
+                    .sendTime(chat.getSendTime())
+                    .senderId(chat.getSenderId())
+                    .build();
+            getChatMessageResList.add(getChatMessageRes);
+        }
+        return getChatMessageResList;
+    }
 }
 
 

@@ -1,6 +1,7 @@
 package com.example.chat;
 
 import com.example.chat.config.FeignConfig;
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -12,7 +13,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.web.client.RestTemplate;
 
-
+import java.util.TimeZone;
 
 
 @EnableFeignClients
@@ -20,7 +21,6 @@ import org.springframework.web.client.RestTemplate;
 @ImportAutoConfiguration({FeignConfig.class})
 @EnableJpaRepositories(basePackages = "com.example.chat")
 @SpringBootApplication
-//@ComponentScan(basePackages = "com.example.chat")
 @EntityScan(basePackages = "com.example.chat.entity")
 public class ChatApplication {
 
@@ -30,6 +30,12 @@ public class ChatApplication {
     @Bean
     public RestTemplate restTemplate() {
         return new RestTemplate();
+    }
+
+    @PostConstruct
+    public void started() {
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
+        System.out.println("Default TimeZone set to Asia/Seoul");
     }
 
 }
