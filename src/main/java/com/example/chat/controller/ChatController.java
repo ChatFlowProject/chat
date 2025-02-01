@@ -3,6 +3,7 @@ package com.example.chat.controller;
 import com.example.chat.common.BaseResponse;
 import com.example.chat.config.MemberServiceClient;
 import com.example.chat.dto.MemberResponse;
+import com.example.chat.dto.request.CreateRoomReq;
 import com.example.chat.dto.request.StartChatReq;
 import com.example.chat.dto.response.GetChatMessageRes;
 import com.example.chat.dto.response.GetChatRoomRes;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Hashtable;
 import java.util.List;
 
 
@@ -23,12 +25,18 @@ public class ChatController {
     private final ChatService chatService;
     private final MemberServiceClient memberServiceClient;
 
-    // 채팅방 생성
+    // 채팅방 생성(1:1)
     @PostMapping("/create")
     public BaseResponse<StartChatRes>  createChatRoom(@Valid @RequestBody StartChatReq startChatReq){
         ResponseEntity<MemberResponse> response = memberServiceClient.getMemberByMemberId("current");
         Long userId = response.getBody().getId();
         return new BaseResponse<>(chatService.startChat(userId, startChatReq));
+    }
+    // 채팅방 생성(1:다)
+    @PostMapping("/createRoom")
+    public BaseResponse<Long> createChatRoom(@RequestBody CreateRoomReq createRoomReq){
+        Long chatRoomId = chatService.createChatRoom(createRoomReq);
+        return new BaseResponse<>(chatRoomId);
     }
     // 채팅방 목록 조회
     @GetMapping("/chatRoomList")
@@ -46,5 +54,6 @@ public class ChatController {
         Long userId = response.getBody().getId();
         return new BaseResponse<>(chatService.getChatMessageList(userId, chatRoomId, page,size));
     }
+
 }
 

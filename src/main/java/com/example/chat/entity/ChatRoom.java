@@ -1,7 +1,6 @@
 package com.example.chat.entity;
 
-import com.example.chat.dto.MemberResponse;
-import com.example.chat.service.ChatServiceIn;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,10 +20,10 @@ public class ChatRoom {
     private Long id;
 
     @Column(nullable = false)
-    private Long user1Id; // 로그인한 사용자의 Primary Key
+    private String roomName;
 
-    @Column(nullable = false)
-    private Long user2Id; // 대상 사용자의 Primary Key
+    @ElementCollection(fetch=FetchType.EAGER) // 참여자 리스트를 별도의 테이블에 저장
+    private List<Long> participants = new ArrayList<>();
 
     // Chat과의 관계 설정 (1:N)
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)

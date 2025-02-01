@@ -7,6 +7,7 @@ import com.example.chat.config.MemberServiceClient;
 import com.example.chat.dto.MemberResponse;
 
 
+import com.example.chat.dto.request.CreateRoomReq;
 import com.example.chat.dto.request.GetMessageReq;
 import com.example.chat.dto.request.StartChatReq;
 import com.example.chat.dto.response.GetChatMessageRes;
@@ -18,6 +19,7 @@ import com.example.chat.repository.ChatRepository;
 import com.example.chat.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -47,25 +49,27 @@ public class ChatService {
         else throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_USER_ID);
     }
 
-    // 새로운 채팅방 생성
+    // 새로운 채팅방 생성(1:1)
     @Transactional
     public StartChatRes startChat(Long userId, StartChatReq startChatReq){
         // 현재 사용자 정보 가져오기
-        MemberResponse currentUser = getMemberById(Long.valueOf("current"));
+        MemberResponse currentUser = getMemberById(userId);
         // 상대방 사용자 정보 가져오기
         MemberResponse recipient = getMemberById(startChatReq.getRecipientId());
         // 자기자신과의 채팅방 생성 금지
-        if(recipient.getId().equals(currentUser.getId())) throw new InvalidChatException(BaseResponseStatus.CHAT_SELF_CHAT);
-        Long user1Id = Math.min(currentUser.getId(), recipient.getId());
-        Long user2Id = Math.max(currentUser.getId(), recipient.getId());
+        if(recipient.getId().equals(currentUser.getId())){
+            throw new InvalidChatException(BaseResponseStatus.CHAT_SELF_CHAT);
+        }
 
         // 기존 채팅방이 있는지 확인
-        Optional<ChatRoom> chatRoomOptional = chatRoomRepository.findByUser1IdAndUser2Id(user1Id, user2Id);
+        List<Long> participants = List.of(currentUser.getId(), recipient.getId());
+        Optional<ChatRoom> chatRoomOptional = chatRoomRepository.findByParticipants(participants);
+
         ChatRoom chatRoom;
-        if(chatRoomOptional.isEmpty()) {
+        if(chatRoomOptional.isEmpty()){
             chatRoom = ChatRoom.builder()
-                    .user1Id(user1Id)
-                    .user2Id(user2Id)
+                    .roomName("1:1 Chat")
+                    .participants(participants)
                     .build();
             chatRoomRepository.save(chatRoom);
         } else {
@@ -76,6 +80,22 @@ public class ChatService {
                 .recipientId(recipient.getId())
                 .build();
     }
+    // 채팅방 생성(1:다)
+    @Transactional
+    public Long createChatRoom(CreateRoomReq createRoomReq){
+        // 참여자 리스트 검증(중복 제거 및 최소 2명 이상)
+        List<Long> paritipants = createRoomReq.getParticipantIds().stream().distinct().toList();
+        if(paritipants.size() < 2) {
+            throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_PARTICIPANTS);
+        }
+        ChatRoom chatRoom = ChatRoom.builder()
+                .roomName(createRoomReq.getRoomName())
+                .participants(paritipants)
+                .build();
+        chatRoomRepository.save(chatRoom);
+        return chatRoom.getId();
+    }
+
 
     // 채팅 메시지 저장
     @Transactional
@@ -84,63 +104,70 @@ public class ChatService {
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
                 .orElseThrow(()->new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
         // 메시지 발신자 확인
-        MemberResponse sender = getMemberById(getMessageReq.getSenderId());
-        if(!chatRoom.getUser1Id().equals(sender.getId()) && !chatRoom.getUser2Id().equals(sender.getId())) {
+        Long senderId = getMessageReq.getSenderId();
+        if(!chatRoom.getParticipants().contains(senderId)){
             throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_USER_ID);
         }
+        // 메시지 저장
         Chat chat = Chat.builder()
                 .chatRoom(chatRoom)
                 .message(getMessageReq.getMessage())
                 .sendTime(LocalDateTime.parse(getMessageReq.getSendTime(), DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                .senderId(senderId)
                 .build();
         chatRepository.save(chat);
     }
     // 채팅방 목록 조회
-
     public List<GetChatRoomRes> getMyChatRoomList(Long userId){
-        // 두 가지 조건으로 채팅방 목록 조회
-        List<ChatRoom> myChatRoomList1 = chatRoomRepository.findAllByUser1Id(userId);
-        List<ChatRoom> myChatRoomList2 = chatRoomRepository.findAllByUser2Id(userId);
+        // 사용자가 포함된 모든 채팅방 조회
+        List<ChatRoom> myChatRooms = chatRoomRepository.findAllByParticipantsContaining(userId);
         // 채팅방 응답 리스트 생성
         List<GetChatRoomRes> myChatRoomResList = new ArrayList<>();
-        makeChatRoomResList(userId, myChatRoomList1, myChatRoomResList, true);
-        makeChatRoomResList(userId, myChatRoomList2, myChatRoomResList, false);
-        // 최근 메시지 시간 기준으로 정렬
-        myChatRoomResList.sort((chatRoomRes1, chatRoomRes2)->chatRoomRes2.getLastMessageDay().compareTo(chatRoomRes1.getLastMessageDay()));
-        return myChatRoomResList;
-    }
+        for(ChatRoom chatRoom: myChatRooms){
+            Long recipientId = chatRoom.getParticipants().stream()
+                    .filter(participantId -> !participantId.equals(userId))
+                    .findFirst() // 1:1 채팅에서는 하나의 상대방만 존재
+                    .orElse(null); // 상대방이 없을 경우 null
 
-    private void makeChatRoomResList(Long userId, List<ChatRoom> chatRooms, List<GetChatRoomRes> myChatRoomResList, boolean isUser1){
-        for(ChatRoom chatRoom: chatRooms){
-            // 상대방 사용자 정보 가져오기
-            Long recipientId = isUser1 ? chatRoom.getUser2Id() : chatRoom.getUser1Id();
-            MemberResponse recipient = getMemberById(recipientId);
-            // 채팅 목록에서 마지막 메시지와 전송 시간 가져오기
+            String participantNames = "";
+            if(recipientId!=null){
+                MemberResponse recipient = getMemberById(recipientId);
+                participantNames = recipient.getName();
+            }
+
             String lastMessage = "";
             LocalDateTime lastSendTime = LocalDateTime.now();
             List<Chat> chatList = chatRoom.getChatList();
-            if(!chatList.isEmpty()){
+            if(!chatList.isEmpty()) {
                 Chat lastChat = chatList.stream()
                         .max(Comparator.comparing(Chat::getSendTime))
-                        .orElseThrow(); // 마지막 메시지 가져오기
-                lastMessage = lastChat.getMessage();
+                        .orElseThrow();
+                lastMessage  = lastChat.getMessage();
                 lastSendTime = lastChat.getSendTime();
             }
             GetChatRoomRes chatRoomRes = GetChatRoomRes.builder()
                     .chatRoomId(chatRoom.getId())
+                    .recipientNickname(participantNames)
+                    .recipientId(recipientId)
                     .lastMessage(lastMessage)
                     .lastMessageDay(lastSendTime)
                     .build();
+
             myChatRoomResList.add(chatRoomRes);
         }
+        return myChatRoomResList;
     }
+
     // 채팅 메시지 조회
     public List<GetChatMessageRes> getChatMessageList(Long userId, Long chatRoomId, Integer page, Integer size){
         Pageable pageable = PageRequest.of(page, size);
-        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId).orElseThrow(()-> new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
-        if(!chatRoom.getUser1Id().equals(userId) && !chatRoom.getUser2Id().equals(userId)) {
+        // 채팅방 조회 및 사용자 검증
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(()-> new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
+        if(!chatRoom.getParticipants().contains(userId)){
             throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID);
         }
+        // 메시지 조회 및 변환
         List<Chat> chatList = chatRepository.findByChatRoomIdOrderBySendTimeDesc(pageable, chatRoomId).stream().toList();
         List<GetChatMessageRes> getChatMessageResList = new ArrayList<>();
         for(Chat chat: chatList){

@@ -13,7 +13,8 @@ public enum BaseResponseStatus {
     CHAT_INVALID_USER_ID(false, 8012, "채팅방에 참여하지 않는 사용자 입니다."),
     CHAT_SELF_CHAT(false, 8013, "자신과 채팅을 진행할 수 없습니다."),
     UNAUTHORIZED_CLIENT(false, 9000, "인증되지 않은 클라이언트입니다."),
-    BAD_ACCESS_TOKEN(false, 9001, "잘못 접근한 토큰입니다.");
+    BAD_ACCESS_TOKEN(false, 9001, "잘못 접근한 토큰입니다."),
+    CHAT_INVALID_PARTICIPANTS(false, 9092, "유효하지 않는 참여자입니다.");
 
 
     private final boolean isSuccess;
