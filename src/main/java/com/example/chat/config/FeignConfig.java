@@ -15,17 +15,22 @@ public class FeignConfig {
     public RequestInterceptor requestInterceptor() {
         return template -> {
             RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
-
             if (requestAttributes != null) {
                 HttpServletRequest request = ((ServletRequestAttributes) requestAttributes).getRequest();
-
                 String token = request.getHeader("Authorization");
                 if (token != null && !token.isEmpty()) {
                     template.header(HttpHeaders.AUTHORIZATION, token);
+                    System.out.println("Token added to header: " + token);
+                } else {
+                    System.out.println("Authorization header is missing or empty");
                 }
+            } else {
+                System.out.println("No RequestAttributes found");
             }
         };
     }
+
+
     // FeignErrorDecorder 사용을 위한 빈을 정의한다.
     @Bean
     public FeignErrorDecoder errorDecoder() {

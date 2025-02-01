@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 @FeignClient(name = "member-service", configuration = FeignConfig.class)
 public interface MemberServiceClient {
-
     @GetMapping("/members/{memberId}")
     ResponseEntity<MemberResponse> getMemberByMemberId(@PathVariable("memberId") String memberId);
 }

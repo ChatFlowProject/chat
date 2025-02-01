@@ -11,6 +11,8 @@ import com.example.chat.dto.response.StartChatRes;
 import com.example.chat.service.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,11 +26,12 @@ import java.util.List;
 public class ChatController {
     private final ChatService chatService;
     private final MemberServiceClient memberServiceClient;
-
+    private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
     // 채팅방 생성(1:1)
     @PostMapping("/create")
     public BaseResponse<StartChatRes>  createChatRoom(@Valid @RequestBody StartChatReq startChatReq){
         ResponseEntity<MemberResponse> response = memberServiceClient.getMemberByMemberId("current");
+        logger.info("feign client response:",response);
         Long userId = response.getBody().getId();
         return new BaseResponse<>(chatService.startChat(userId, startChatReq));
     }

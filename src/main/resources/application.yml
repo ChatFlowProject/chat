@@ -45,7 +45,15 @@ tag:
 feign:
   client:
     name: member
-    url: https://dashboard.flowchat.shop:30001
+    url: https://dashboard.flowchat.shop:30002
 
 kafka:
   url: localhost:9092
+
+logging:
+  level:
+    org.springframework.cloud.openfeign: DEBUG
+    feign: DEBUG
+
+
+
