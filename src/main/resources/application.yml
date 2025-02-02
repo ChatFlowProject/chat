@@ -45,7 +45,7 @@ tag:
 feign:
   client:
     name: member
-    url: https://dashboard.flowchat.shop:30002
+    url: http://flowchat.shop:30002
 
 kafka:
   url: localhost:9092

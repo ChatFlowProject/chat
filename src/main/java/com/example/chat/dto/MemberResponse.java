@@ -1,13 +1,19 @@
 package com.example.chat.dto;
 
+import com.example.chat.common.MemberType;
 import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 public class MemberResponse {
-    private Long id;         // Primary Key
-    private String memberId; // 사용자 고유 ID
+    private UUID id;         // Primary Key
+    private String nickname;
     private String email;    // 이메일
-    private String name;     // 이름
-    private String memberState; // 상태 (예: ACTIVE, INACTIVE)
+    private String name;
+    private String birth;
+    private MemberType type;
+    private LocalDateTime createdAt;
 }
 

@@ -1,13 +1,10 @@
 package com.example.chat.service;
 
 import com.example.chat.Exception.custom.InvalidChatException;
-import com.example.chat.common.BaseResponse;
 import com.example.chat.common.BaseResponseStatus;
 import com.example.chat.config.MemberServiceClient;
 import com.example.chat.dto.MemberResponse;
 
-
-import com.example.chat.dto.request.CreateRoomReq;
 import com.example.chat.dto.request.GetMessageReq;
 import com.example.chat.dto.request.StartChatReq;
 import com.example.chat.dto.response.GetChatMessageRes;
@@ -29,10 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 
 @Service
@@ -42,33 +36,50 @@ public class ChatService {
     private final ChatRoomRepository chatRoomRepository;
     private final MemberServiceClient memberServiceClient;
 
-    // 회원서버에서 ID로 사용자 정보 가져오기
-    private MemberResponse getMemberById(Long memberId){
-        ResponseEntity<MemberResponse> response = memberServiceClient.getMemberByMemberId(String.valueOf(memberId));
-        if(response.getStatusCode().is2xxSuccessful() && response.getBody() != null) return response.getBody();
-        else throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_USER_ID);
+    // 회원서버에서 UUID로 사용자 정보 가져오기
+    private MemberResponse getMemberById(String memberId) {
+        UUID uuidMemberId;
+        try {
+            uuidMemberId = UUID.fromString(memberId);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_USER_ID);
+        }
+
+        ResponseEntity<MemberResponse> response = memberServiceClient.getMemberById(uuidMemberId.toString());
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            return response.getBody();
+        } else {
+            throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_USER_ID);
+        }
     }
+
 
     // 새로운 채팅방 생성(1:1)
     @Transactional
-    public StartChatRes startChat(Long userId, StartChatReq startChatReq){
+    public StartChatRes startChat(String userId, StartChatReq startChatReq){
         // 현재 사용자 정보 가져오기
         MemberResponse currentUser = getMemberById(userId);
         // 상대방 사용자 정보 가져오기
-        MemberResponse recipient = getMemberById(startChatReq.getRecipientId());
-        // 자기자신과의 채팅방 생성 금지
-        if(recipient.getId().equals(currentUser.getId())){
+        List<String> recipientIds = startChatReq.getRecipientIds();
+        if(recipientIds.contains(userId.toString())){ // 자기자신과의 채팅방 생성 금지
             throw new InvalidChatException(BaseResponseStatus.CHAT_SELF_CHAT);
         }
 
         // 기존 채팅방이 있는지 확인
-        List<Long> participants = List.of(currentUser.getId(), recipient.getId());
+        List<UUID> participants = new ArrayList<>();
+        participants.add(currentUser.getId());
+        for(String recipientId: recipientIds){
+            MemberResponse recipient = getMemberById(recipientId);
+            participants.add(recipient.getId());
+        }
+        // 같은 참여자가 있는지 확인
         Optional<ChatRoom> chatRoomOptional = chatRoomRepository.findByParticipants(participants);
 
         ChatRoom chatRoom;
         if(chatRoomOptional.isEmpty()){
+            String roomName = participants.size() > 2 ? "group chat": "1:1 chat";
             chatRoom = ChatRoom.builder()
-                    .roomName("1:1 Chat")
+                    .roomName(roomName)
                     .participants(participants)
                     .build();
             chatRoomRepository.save(chatRoom);
@@ -77,23 +88,8 @@ public class ChatService {
         }
         return StartChatRes.builder()
                 .chatRoomId(chatRoom.getId())
-                .recipientId(recipient.getId())
+                .recipientIds(recipientIds)
                 .build();
-    }
-    // 채팅방 생성(1:다)
-    @Transactional
-    public Long createChatRoom(CreateRoomReq createRoomReq){
-        // 참여자 리스트 검증(중복 제거 및 최소 2명 이상)
-        List<Long> paritipants = createRoomReq.getParticipantIds().stream().distinct().toList();
-        if(paritipants.size() < 2) {
-            throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_PARTICIPANTS);
-        }
-        ChatRoom chatRoom = ChatRoom.builder()
-                .roomName(createRoomReq.getRoomName())
-                .participants(paritipants)
-                .build();
-        chatRoomRepository.save(chatRoom);
-        return chatRoom.getId();
     }
 
 
@@ -118,20 +114,20 @@ public class ChatService {
         chatRepository.save(chat);
     }
     // 채팅방 목록 조회
-    public List<GetChatRoomRes> getMyChatRoomList(Long userId){
+    public List<GetChatRoomRes> getMyChatRoomList(UUID userId){
         // 사용자가 포함된 모든 채팅방 조회
         List<ChatRoom> myChatRooms = chatRoomRepository.findAllByParticipantsContaining(userId);
         // 채팅방 응답 리스트 생성
         List<GetChatRoomRes> myChatRoomResList = new ArrayList<>();
         for(ChatRoom chatRoom: myChatRooms){
-            Long recipientId = chatRoom.getParticipants().stream()
+            UUID recipientId = chatRoom.getParticipants().stream()
                     .filter(participantId -> !participantId.equals(userId))
                     .findFirst() // 1:1 채팅에서는 하나의 상대방만 존재
                     .orElse(null); // 상대방이 없을 경우 null
 
             String participantNames = "";
             if(recipientId!=null){
-                MemberResponse recipient = getMemberById(recipientId);
+                MemberResponse recipient = getMemberById(String.valueOf(recipientId));
                 participantNames = recipient.getName();
             }
 
@@ -146,7 +142,7 @@ public class ChatService {
                 lastSendTime = lastChat.getSendTime();
             }
             GetChatRoomRes chatRoomRes = GetChatRoomRes.builder()
-                    .chatRoomId(chatRoom.getId())
+//                    .chatRoomId(chatRoom.getId())
                     .recipientNickname(participantNames)
                     .recipientId(recipientId)
                     .lastMessage(lastMessage)
@@ -159,7 +155,7 @@ public class ChatService {
     }
 
     // 채팅 메시지 조회
-    public List<GetChatMessageRes> getChatMessageList(Long userId, Long chatRoomId, Integer page, Integer size){
+    public List<GetChatMessageRes> getChatMessageList(UUID userId, Long chatRoomId, Integer page, Integer size){
         Pageable pageable = PageRequest.of(page, size);
         // 채팅방 조회 및 사용자 검증
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)

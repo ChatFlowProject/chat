@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Hashtable;
 import java.util.List;
+import java.util.UUID;
 
 
 @RestController
@@ -27,36 +27,77 @@ public class ChatController {
     private final ChatService chatService;
     private final MemberServiceClient memberServiceClient;
     private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
-    // 채팅방 생성(1:1)
+
+    // 사용자 ID 조회 메서드
+    private UUID getUserId(String memberId) {
+        logger.info("Fetching user ID for memberId: {}", memberId);
+        ResponseEntity<MemberResponse> response = memberServiceClient.getMemberById(memberId);
+
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            logger.error("Failed to fetch user ID for memberId: {}. Status: {}", memberId, response.getStatusCode());
+            throw new RuntimeException("Unable to fetch user information for memberId: " + memberId);
+        }
+
+        UUID userId = response.getBody().getId();
+        logger.info("Successfully fetched user ID: {} for memberId: {}", userId, memberId);
+        return userId;
+    }
+
+    // 채팅방 생성
     @PostMapping("/create")
-    public BaseResponse<StartChatRes>  createChatRoom(@Valid @RequestBody StartChatReq startChatReq){
-        ResponseEntity<MemberResponse> response = memberServiceClient.getMemberByMemberId("current");
-        logger.info("feign client response:",response);
-        Long userId = response.getBody().getId();
-        return new BaseResponse<>(chatService.startChat(userId, startChatReq));
-    }
-    // 채팅방 생성(1:다)
-    @PostMapping("/createRoom")
-    public BaseResponse<Long> createChatRoom(@RequestBody CreateRoomReq createRoomReq){
-        Long chatRoomId = chatService.createChatRoom(createRoomReq);
-        return new BaseResponse<>(chatRoomId);
-    }
-    // 채팅방 목록 조회
-    @GetMapping("/chatRoomList")
-    public BaseResponse<List<GetChatRoomRes>> chatRoomList(){
-        // 현재 사용자 정보 조회
-        ResponseEntity<MemberResponse> response = memberServiceClient.getMemberByMemberId("current");
-        Long userId = response.getBody().getId();
-        return new BaseResponse<>(chatService.getMyChatRoomList(userId));
-    }
-    // 메시지 조회
-    @GetMapping("/messageList")
-    public BaseResponse<List<GetChatMessageRes>> getChatMessageList(Long chatRoomId, Integer page, Integer size){
-        // 현재 사용자 정보 조회
-        ResponseEntity<MemberResponse> response = memberServiceClient.getMemberByMemberId("current");
-        Long userId = response.getBody().getId();
-        return new BaseResponse<>(chatService.getChatMessageList(userId, chatRoomId, page,size));
+    public BaseResponse<StartChatRes> createChatRoom(@Valid @RequestBody StartChatReq startChatReq) {
+        try {
+            // 현재 사용자 ID 가져오기 (예: "current"는 현재 사용자 식별자)
+            UUID userId = getUserId("current");
+            logger.info("Creating chat room for user ID: {}", userId);
+
+            StartChatRes result = chatService.startChat(userId.toString(), startChatReq);
+            logger.info("Chat room created successfully with ID: {}", result.getChatRoomId());
+
+            return new BaseResponse<>(result);
+        } catch (Exception e) {
+            logger.error("Error creating chat room: {}", e.getMessage(), e);
+            return new BaseResponse<>();
+        }
     }
 
+    // 사용자의 채팅방 목록 조회
+    @GetMapping("/rooms")
+    public BaseResponse<List<GetChatRoomRes>> getChatRoomList() {
+        try {
+            // 현재 사용자 ID 가져오기
+            UUID userId = getUserId("current");
+            logger.info("Fetching chat rooms for user ID: {}", userId);
+
+            List<GetChatRoomRes> chatRooms = chatService.getMyChatRoomList(userId);
+            logger.info("Successfully fetched {} chat rooms for user ID: {}", chatRooms.size(), userId);
+
+            return new BaseResponse<>(chatRooms);
+        } catch (Exception e) {
+            logger.error("Error fetching chat room list: {}", e.getMessage(), e);
+            return new BaseResponse<>();
+        }
+    }
+
+    // 특정 채팅방의 메시지 목록 조회
+    @GetMapping("/messages")
+    public BaseResponse<List<GetChatMessageRes>> getChatMessageList(
+            @RequestParam Long chatRoomId,
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "20") Integer size) {
+
+        try {
+            // 현재 사용자 ID 가져오기
+            UUID userId = getUserId("current");
+            logger.info("Fetching messages for chat room ID: {} and user ID: {}", chatRoomId, userId);
+
+            List<GetChatMessageRes> messages = chatService.getChatMessageList(userId, chatRoomId, page, size);
+            logger.info("Successfully fetched {} messages for chat room ID: {}", messages.size(), chatRoomId);
+
+            return new BaseResponse<>(messages);
+        } catch (Exception e) {
+            logger.error("Error fetching messages for chat room ID {}: {}", chatRoomId, e.getMessage(), e);
+            return new BaseResponse<>();
+        }
+    }
 }
-

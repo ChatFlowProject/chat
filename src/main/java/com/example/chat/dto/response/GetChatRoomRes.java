@@ -4,13 +4,14 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Builder
 public class GetChatRoomRes {
-    private Long chatRoomId;
+    private UUID chatRoomId;
     private String recipientNickname;
-    private Long recipientId;
+    private UUID recipientId;
     private String lastMessage;
     private LocalDateTime lastMessageDay;
 }
