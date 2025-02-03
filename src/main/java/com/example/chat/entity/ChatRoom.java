@@ -24,11 +24,13 @@ public class ChatRoom {
     @Column(nullable = false)
     private String roomName;
 
+    @Builder.Default
     @ElementCollection(fetch=FetchType.EAGER) // 참여자 리스트를 별도의 테이블에 저장
-    private List<UUID> participants = new ArrayList<>();
+    private final List<UUID> participants = new ArrayList<>();
 
     // Chat과의 관계 설정 (1:N)
+    @Builder.Default
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Chat> chatList = new ArrayList<>();
+    private final List<Chat> chatList = new ArrayList<>();
 }
 

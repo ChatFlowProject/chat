@@ -12,6 +12,7 @@ import com.example.chat.dto.response.GetChatRoomRes;
 import com.example.chat.dto.response.StartChatRes;
 import com.example.chat.entity.Chat;
 import com.example.chat.entity.ChatRoom;
+import com.example.chat.file.service.CloudFileUploadService;
 import com.example.chat.repository.ChatRepository;
 import com.example.chat.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 
 import java.time.LocalDateTime;
@@ -35,6 +37,7 @@ public class ChatService {
     private final ChatRepository chatRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final MemberServiceClient memberServiceClient;
+    private final CloudFileUploadService cloudFileUploadService;
 
     // 회원서버에서 UUID로 사용자 정보 가져오기
     private MemberResponse getMemberById(String memberId) {
@@ -95,7 +98,7 @@ public class ChatService {
 
     // 채팅 메시지 저장
     @Transactional
-    public void saveChat(GetMessageReq getMessageReq, Long chatRoomId){
+    public void saveChat(GetMessageReq getMessageReq, Long chatRoomId, MultipartFile imgFile){
         // 채팅방 조회
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
                 .orElseThrow(()->new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
@@ -104,12 +107,19 @@ public class ChatService {
         if(!chatRoom.getParticipants().contains(senderId)){
             throw new InvalidChatException(BaseResponseStatus.CHAT_INVALID_USER_ID);
         }
+        // 이미지 업로드 처리
+        String imageUrl = null;
+        if(imgFile != null && !imageUrl.isEmpty()) {
+            imageUrl = cloudFileUploadService.uploadImg(imgFile); // 이미지 업로드 후 url 반환
+        }
+
         // 메시지 저장
         Chat chat = Chat.builder()
                 .chatRoom(chatRoom)
                 .message(getMessageReq.getMessage())
                 .sendTime(LocalDateTime.parse(getMessageReq.getSendTime(), DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                 .senderId(senderId)
+                .imageUrl(imageUrl)
                 .build();
         chatRepository.save(chat);
     }

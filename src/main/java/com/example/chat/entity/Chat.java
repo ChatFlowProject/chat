@@ -27,6 +27,8 @@ public class Chat {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
 
+    private String imageUrl;
+
     // 발신자 ID (회원 ID)
     @Column(nullable = false)
     private Long senderId;
