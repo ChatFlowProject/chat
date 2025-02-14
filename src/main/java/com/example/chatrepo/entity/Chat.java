@@ -1,5 +1,6 @@
 package com.example.chatrepo.entity;
 
+import com.example.chatrepo.dto.Attachment;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +10,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -34,6 +36,12 @@ public class Chat {
     // 발신자 ID (회원 ID)
     @Column(nullable = false, columnDefinition = "VARCHAR(36)")
     private UUID senderId;
+
+    @Column(nullable = false)
+    private LocalDateTime timestamp;
+
+    @ElementCollection(fetch=FetchType.EAGER)
+    private List<Attachment> attachments;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="chat_room_id", nullable = false)

@@ -2,8 +2,10 @@ package com.example.chatrepo.repository;
 
 import com.example.chatrepo.entity.ChatRoom;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,5 +38,12 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
 
     // 채팅방 이름에 키워드가 포함된 채팅방 검색 (대소문자 구분 없음)
     List<ChatRoom> findByRoomNameContainingIgnoreCase(String roomName);
+
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM ChatRoom c WHERE c.id = :id AND :userId MEMBER OF c.participants")
+    void deleteByIdAndUserId(@Param("id") Long id, @Param("userId") UUID userId);
+
 }
 

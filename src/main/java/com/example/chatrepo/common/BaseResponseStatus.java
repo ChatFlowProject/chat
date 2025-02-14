@@ -20,6 +20,7 @@ public enum BaseResponseStatus {
     CHAT_MESSAGE_DELETE_FAILED(false, 8018, "체팅 메시지를 삭제하는 데 실패했습니다."),
     CHAT_ROOM_DELETE_FAILED(false, 8019, "채팅방를 삭제하는데 실패했습니다."),
     CHAT_MESSAGE_NOT_FOUND(false, 8020, "해당 메세지를 찾을 수 없습니다."),
+    CHAT_ROOM_USER_NOT(false, 8021, "해당 채팅방에 해당 사용자가 없습니다."),
 
 
     // 유저 기능 - 2000

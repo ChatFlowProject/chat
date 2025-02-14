@@ -3,8 +3,11 @@ package com.example.chatrepo.service;
 import com.example.chatrepo.common.*;
 import com.example.chatrepo.config.MemberServiceClient;
 import com.example.chatrepo.dto.ChatRoomDetail;
+import com.example.chatrepo.dto.Sender;
+import com.example.chatrepo.dto.req.ChatMessageReq;
 import com.example.chatrepo.dto.req.CreateChatRoomReq;
 import com.example.chatrepo.dto.req.GetMessageReq;
+import com.example.chatrepo.dto.res.ChatMessageRes;
 import com.example.chatrepo.dto.res.CreateChatRoomRes;
 import com.example.chatrepo.dto.res.GetChatRoomRes;
 import com.example.chatrepo.dto.Participant;
@@ -178,6 +181,53 @@ public class ChatService {
                 .query(query)
                 .chatRooms(chatRooms)
                 .build();
+    }
+    public ChatMessageRes processMessage(Long chatroomId, ChatMessageReq chatMessageReq){
+        // 채팅방 확인
+        ChatRoom chatRoom = chatRoomRepository.findById(chatroomId).orElseThrow(()->new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
+        MemberResponse sender = findMemberById(chatMessageReq.getSenderId());
+        // 메시지 저장
+        Chat chat = Chat.builder()
+                .chatRoom(chatRoom)
+                .senderId(chatMessageReq.getSenderId())
+                .message(chatMessageReq.getMessage())
+                .attachments(chatMessageReq.getAttachments())
+                .sendTime(LocalDateTime.now())
+                .build();
+        chatRepository.save(chat);
+        // 참여자 정보 생성
+        List<Participant> participants = chatRoom.getParticipants().stream()
+                .map(participantId -> {
+                    MemberResponse member = findMemberById(participantId);
+                    return Participant.builder()
+                            .userId(participantId)
+                            .nickname(member.getNickname())
+                            .build();
+                }).collect(Collectors.toList());
+        return ChatMessageRes.builder()
+                .messageId(chat.getId())
+                .chatRoomId(chatRoom.getId())
+                .sender(Sender.builder()
+                        .userId(sender.getId())
+                        .username(sender.getNickname())
+                        .build())
+                .message(chat.getMessage())
+                .attachments(chat.getAttachments())
+                .timestamp(chat.getTimestamp())
+                .status("sent")
+                .build();
+    }
+
+    @Transactional
+    public void leaveChatRoom(Long chatRoomId, UUID userId){
+        // 채팅방 존재 여부 확인
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId).orElseThrow(()-> new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
+        // participants 컬렉션에서 사용자 제거
+        if(chatRoom.getParticipants().remove(userId)){
+            chatRoomRepository.save(chatRoom);
+        } else {
+            throw new InvalidChatException(BaseResponseStatus.CHAT_ROOM_USER_NOT);
+        }
     }
 }
 
