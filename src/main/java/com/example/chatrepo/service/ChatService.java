@@ -1,7 +1,9 @@
 package com.example.chatrepo.service;
 
 import com.example.chatrepo.common.*;
-import com.example.chatrepo.config.MemberServiceClient;
+import com.example.chatrepo.config.member_server.MemberServiceClient;
+import com.example.chatrepo.config.noti_server.MentionNotificationRequest;
+import com.example.chatrepo.config.noti_server.NotificationClient;
 import com.example.chatrepo.dto.ChatRoomDetail;
 import com.example.chatrepo.dto.Sender;
 import com.example.chatrepo.dto.req.ChatMessageReq;
@@ -18,7 +20,11 @@ import com.example.chatrepo.exception.custom.InvalidChatException;
 import com.example.chatrepo.file.CloudFileUploadService;
 import com.example.chatrepo.repository.ChatRepository;
 import com.example.chatrepo.repository.ChatRoomRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.FlushMode;
+import org.hibernate.Session;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,6 +32,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +43,10 @@ public class ChatService {
     private final ChatRoomRepository chatRoomRepository;
     private final MemberServiceClient memberServiceClient;
     private final CloudFileUploadService cloudFileUploadService;
+    private final NotificationClient notificationClient;
+
+    @Autowired
+    private EntityManager entityManager;
 
     // 모든 멤버 조회 메서드
     public List<MemberResponse> getAllMembers() {
@@ -185,16 +197,30 @@ public class ChatService {
     public ChatMessageRes processMessage(Long chatroomId, ChatMessageReq chatMessageReq){
         // 채팅방 확인
         ChatRoom chatRoom = chatRoomRepository.findById(chatroomId).orElseThrow(()->new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
-        MemberResponse sender = findMemberById(chatMessageReq.getSenderId());
+        MemberResponse sender = findMemberById(chatMessageReq.getUserId());
         // 메시지 저장
         Chat chat = Chat.builder()
                 .chatRoom(chatRoom)
-                .senderId(chatMessageReq.getSenderId())
+                .senderId(chatMessageReq.getUserId())
                 .message(chatMessageReq.getMessage())
                 .attachments(chatMessageReq.getAttachments())
                 .sendTime(LocalDateTime.now())
                 .build();
         chatRepository.save(chat);
+
+        // 멘션된 사용자 추출 및 알림 전송
+        List<MemberResponse> allMembers = getAllMembers();
+        List<UUID> mentionedUserIds = extractMentionedUserIds(chat.getMessage(), allMembers);
+        if(!mentionedUserIds.isEmpty()){
+            MentionNotificationRequest notificationRequest = MentionNotificationRequest.builder()
+                    .receiverIds(mentionedUserIds)
+                    .senderId(chatMessageReq.getUserId())
+                    .message(chat.getMessage())
+                    .chatRoomId(chatroomId)
+                    .build();
+            notificationClient.sendMentionNotification(notificationRequest);
+        }
+
         // 참여자 정보 생성
         List<Participant> participants = chatRoom.getParticipants().stream()
                 .map(participantId -> {
@@ -217,17 +243,43 @@ public class ChatService {
                 .status("sent")
                 .build();
     }
+    public List<UUID> extractMentionedUserIds(String message, List<MemberResponse> allMembers){
+        Pattern mentionPattern = Pattern.compile("@(\\\\w+)");
+        Matcher matcher = mentionPattern.matcher(message);
+        List<UUID> mentionedUserIds = new ArrayList<>();
+        while(matcher.find()){
+            String username = matcher.group(1); // @ 두의 닉네임 추출
+            allMembers.stream()
+                    .filter(member-> member.getNickname().equals(username))
+                    .findFirst()
+                    .ifPresent(member->mentionedUserIds.add(member.getId()));
+        }
+        return mentionedUserIds;
+    }
 
     @Transactional
-    public void leaveChatRoom(Long chatRoomId, UUID userId){
-        // 채팅방 존재 여부 확인
-        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId).orElseThrow(()-> new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
-        // participants 컬렉션에서 사용자 제거
-        if(chatRoom.getParticipants().remove(userId)){
-            chatRoomRepository.save(chatRoom);
-        } else {
+    public void leaveChatRoom(Long chatRoomId, UUID userId) {
+        // Hibernate의 플러시 모드를 ALWAYS로 설정
+        entityManager.unwrap(Session.class).setHibernateFlushMode(FlushMode.ALWAYS);
+
+        // 채팅방 조회
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> new InvalidChatException(BaseResponseStatus.CHAT_INVALID_CHATROOM_ID));
+
+        if (chatRoom.getParticipants().size() == 2 && chatRoom.getParticipants().contains(userId)) {
+            throw new InvalidChatException(BaseResponseStatus.CHAT_CANNOT_LEAVE_ONE_TO_ONE);
+        }
+
+        // 참여자 목록 수정
+        List<UUID> updatedParticipants = new ArrayList<>(chatRoom.getParticipants());
+        boolean removed = updatedParticipants.remove(userId);
+        if (!removed) {
             throw new InvalidChatException(BaseResponseStatus.CHAT_ROOM_USER_NOT);
         }
+        chatRoom.setParticipants(updatedParticipants);
+
+        // 저장 및 강제 동기화
+        chatRoomRepository.save(chatRoom);
     }
 }
 

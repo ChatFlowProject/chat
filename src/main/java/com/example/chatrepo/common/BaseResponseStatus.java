@@ -21,12 +21,7 @@ public enum BaseResponseStatus {
     CHAT_ROOM_DELETE_FAILED(false, 8019, "채팅방를 삭제하는데 실패했습니다."),
     CHAT_MESSAGE_NOT_FOUND(false, 8020, "해당 메세지를 찾을 수 없습니다."),
     CHAT_ROOM_USER_NOT(false, 8021, "해당 채팅방에 해당 사용자가 없습니다."),
-
-
-    // 유저 기능 - 2000
-    UNAUTHORIZED_CLIENT(false, 2000, "인증되지 않은 클라이언트입니다."),
-    BAD_ACCESS_TOKEN(false, 2001, "잘못 접근한 토큰입니다."),
-    CHAT_INVALID_PARTICIPANTS(false, 2092, "유효하지 않는 참여자입니다."),
+    CHAT_CANNOT_LEAVE_ONE_TO_ONE(false, 8022, "1:1채팅방에서는 채팅방을 나갈수 없습니다."),
 
     // 파일 기능 - 3000
     EXCEED_MAX_SIZE(false, 3001, "파일의 크기가 큽니다."),

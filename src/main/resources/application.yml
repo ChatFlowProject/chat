@@ -14,7 +14,7 @@ spring:
 
 
   kafka:
-    bootstrap-servers: localhost:9092 # Kubernetes Kafka ??? ??? ??
+    bootstrap-servers: flowchat.shop:30010 # Kubernetes Kafka ??? ??? ??
     consumer:
       group-id: my-consumer-group
       auto-offset-reset: earliest
@@ -41,6 +41,7 @@ cloud:
     s3:
       bucket: ${S3_BUCKET}
 
+
 tag:
   version: 0.2.0
 
@@ -56,7 +57,12 @@ logging:
     org.springframework: WARN                 # Spring Framework ???? ??? ?? ???
     org.springframework.web: WARN             # Spring Web ?? ??? ?? ???
     org.springframework.security: WARN        # Spring Security ?? ??? ?? ???
-
+    org.springframework.messaging.simp: DEBUG
+    org.springframework.web.socket: DEBUG
 
 server:
   port: 8089
+  servlet:
+    session:
+      timeout: 60m
+

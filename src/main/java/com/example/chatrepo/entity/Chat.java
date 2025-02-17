@@ -28,6 +28,7 @@ public class Chat {
     @Column(nullable = false)
     @CreatedDate
     private LocalDateTime sendTime;
+
     @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
 
