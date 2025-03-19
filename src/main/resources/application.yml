@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: chat-service
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://34.47.106.167:3306/chatflow?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: chatflow
+    password: 1234
+  jpa:
+    database: mysql
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate.format_sql: true
+      dialect: org.hibernate.dialect.MySQL8InnoDBDialect
+
+  kafka:
+    bootstrap-servers: 34.64.134.80:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: consumer-group-id
+
+  cloud:
+    gcp:
+      project-id: braided-period-444315-k6
+      credentials:
+        location: classpath:braided-period-444315-k6-9edb0d0bb1b0.json
+
+
+tag:
+  version: 0.2.0
+
+logging:
+  level:
+    org.springframework.cloud.openfeign: DEBUG  # OpenFeign ?? ??? ?? ???
+    feign: DEBUG                               # Feign Client ??/?? ??? ?? ???
+    org.springframework: WARN                 # Spring Framework ???? ??? ?? ???
+    org.springframework.web: WARN             # Spring Web ?? ??? ?? ???
+    org.springframework.security: WARN        # Spring Security ?? ??? ?? ???
+    org.springframework.messaging.simp: DEBUG
+    org.springframework.web.socket: DEBUG
+
+server:
+  servlet:
+    session:
+      timeout: 60m
+
+feign:
+  client:
+    member-service:
+      token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI2ZmE5ODY2OC1mNDk2LTRkMjQtYTY1Mi0zNWMxZmE1MjBhZjk6QURNSU4iLCJpc3MiOiJqZXJyeTAzMzkiLCJpYXQiOjE3NDAxMTU2MTAsImV4cCI6MTc3MjUxNTYxMH0.ef3mUingRTFMwI2UtDwpxl8KXtdfmSCs0HgZqxanWy5Z9klGxCb-wjSs8J5wUzsHQUAgQj0Kys-SrJ8P1HGYbg
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+
